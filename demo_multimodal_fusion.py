@@ -1,65 +1,80 @@
-import threading
-import queue
+# fusion_emotion.py
+print("Initializing Multimodal Emotion Fusion System... 🚀")
 import time
-import numpy as np
+# Note: Ensure you have your other files named correctly for these imports
+from demo_speech_emotion import get_speech_emotion
+from demo_facial_emotion import get_facial_emotion
+print("Modules imported successfully. ✅")
 
-# Import your existing modules
-from demo_speech_emotion import predict_speech_emotion
-from demo_facial_emotion import predict_facial_emotion
 
-# Shared queues for predictions
-speech_queue = queue.Queue()
-face_queue = queue.Queue()
+def fuse_emotions(speech_emotion, facial_emotion):
+    """
+    Simple fusion logic with print statements explaining the decision.
+    - Prioritizes facial emotion in case of disagreement.
+    - Handles cases where one modality fails or returns an error.
+    """
+    # Check if the inputs are valid detections (not None or error messages)
+    is_facial_valid = facial_emotion and "error" not in facial_emotion and "detected" not in facial_emotion
+    is_speech_valid = speech_emotion and "error" not in speech_emotion
 
-# Thread target for speech emotion
-def run_speech():
-    for emotion, score in predict_speech_emotion():
-        speech_queue.put((emotion, score))
-
-# Thread target for facial emotion
-def run_face():
-    for emotion, score in predict_facial_emotion():
-        face_queue.put((emotion, score))
-
-# Fusion function
-def fuse_emotions(speech_data, face_data):
-    # Example: Weighted average based on confidence
-    if not speech_data or not face_data:
-        return speech_data or face_data
-    
-    speech_emotion, speech_score = speech_data
-    face_emotion, face_score = face_data
-
-    # Simple fusion
-    if speech_emotion == face_emotion:
-        return speech_emotion, (speech_score + face_score) / 2
+    if is_facial_valid and is_speech_valid:
+        print("💡 Both facial and speech emotions were detected.")
+        if facial_emotion.lower() == speech_emotion.lower():
+            print(f"   - Agreement found: Both indicate '{facial_emotion}'.")
+            return facial_emotion
+        else:
+            print(f"   - Disagreement: Facial is '{facial_emotion}', Speech is '{speech_emotion}'.")
+            print("   - Prioritizing the facial emotion as the final result.")
+            return facial_emotion  # Prioritize facial emotion in case of conflict
+            
+    elif is_facial_valid:
+        print(f"💡 Only a valid facial emotion ('{facial_emotion}') was detected.")
+        return facial_emotion
+        
+    elif is_speech_valid:
+        print(f"💡 Only a valid speech emotion ('{speech_emotion}') was detected.")
+        return speech_emotion
+        
     else:
-        # Choose the one with higher confidence
-        return max([speech_data, face_data], key=lambda x: x[1])
+        print("🔌 Could not determine a valid emotion from either modality.")
+        return "Undetermined"
 
-# Main fusion loop
+
 def main():
-    threading.Thread(target=run_speech, daemon=True).start()
-    threading.Thread(target=run_face, daemon=True).start()
-
-    speech_data, face_data = None, None
-
+    """Main loop to capture and fuse emotions."""
+    print("\n" + "="*50)
+    print("    Multimodal Emotion Recognition".center(50))
+    print("="*50)
+    
     while True:
-        # Get latest predictions
-        try:
-            while not speech_queue.empty():
-                speech_data = speech_queue.get_nowait()
-            while not face_queue.empty():
-                face_data = face_queue.get_nowait()
-        except queue.Empty:
-            pass
+        # --- Step 1: Data Acquisition ---
+        print("\n--- [STEP 1: CAPTURING DATA] ---")
+        # The print statements from your other scripts will show progress here
+        speech = get_speech_emotion(duration=3)
+        facial = get_facial_emotion()
 
-        # Fuse predictions
-        if speech_data or face_data:
-            final_emotion, confidence = fuse_emotions(speech_data, face_data)
-            print(f"[FUSED] Emotion: {final_emotion} (Conf: {confidence:.2f})")
+        # --- Step 2: Fusion Logic ---
+        print("\n--- [STEP 2: FUSING RESULTS] ---")
+        fused = fuse_emotions(speech, facial)
+        
+        # --- Step 3: Final Report ---
+        print("\n--- [FINAL REPORT] ---")
+        print(f"    🎤 Speech Input: {speech.upper()}")
+        print(f"    🙂 Facial Input: {facial.upper()}")
+        print("-" * 28)
+        print(f"    🔗 Fused Result: {fused.upper()}")
+        print("-" * 28)
+        
+        # Pause before asking for input
+        time.sleep(1)
+        
+        # Ask user to continue
+        cont = input("\nPress Enter to run again or 'q' to quit: ")
+        if cont.lower() == 'q':
+            break
+            
+    print("\nProgram terminated. Goodbye! 👋")
 
-        time.sleep(0.5)
 
 if __name__ == "__main__":
     main()

@@ -1,25 +1,38 @@
-# demo_speech_emotion.py
-import librosa
+import sounddevice as sd
 import torch
-from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
+import numpy as np
+from transformers import Wav2Vec2FeatureExtractor, AutoModelForAudioClassification
 
-MODEL = "superb/wav2vec2-base-superb-er"
-feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL)
-model = AutoModelForAudioClassification.from_pretrained(MODEL)
+# Model name
+MODEL_NAME = "superb/wav2vec2-base-superb-er"
 
-# Load an audio file (replace with your own .wav)
-file = "03-01-02-01-01-01-04.wav"
-speech, sr = librosa.load(file, sr=16000)  # Resample to 16kHz
+# Load feature extractor & model (skip tokenizer)
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(MODEL_NAME)
+model = AutoModelForAudioClassification.from_pretrained(MODEL_NAME)
 
-# Preprocess
-inputs = feature_extractor(
-    speech, sampling_rate=16000, return_tensors="pt", padding=True
-)
+# Function to record live audio
+def record_audio(duration=10
+                 , samplerate=16000):
+    print(f"🎙️ Recording {duration} seconds...")
+    audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype='float32')
+    sd.wait()
+    print("✅ Recording done!")
+    return np.squeeze(audio)
 
-# Run inference
-with torch.no_grad():
-    logits = model(**inputs).logits
-predicted_id = torch.argmax(logits, dim=-1).item()
-label = model.config.id2label[predicted_id]
+# Function to predict emotion
+def predict_emotion(audio):
+    inputs = feature_extractor(audio, sampling_rate=16000, return_tensors="pt", padding=True)
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    predicted_class = torch.argmax(logits, dim=-1).item()
+    label = model.config.id2label[predicted_class]
+    return label
 
-print(f"Predicted Emotion: {label}")
+if __name__ == "__main__":
+    while True:
+        audio = record_audio()
+        emotion = predict_emotion(audio)
+        print(f"🎯 Predicted Emotion: {emotion}")
+        cont = input("Press Enter to record again or type 'q' to quit: ")
+        if cont.lower() == 'q':
+            break
